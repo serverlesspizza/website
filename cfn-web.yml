@@ -1,0 +1,152 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Serverless Pizza Infrastructure for Web
+
+Parameters:
+  DevOpsAccount:
+    Description: AWS AccountNumber for DevOps
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/devops_account'
+  DevAccount:
+    Description: AWS AccountNumber for Development
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/dev_account'
+  ProductionAccount:
+    Description: AWS AccountNumber for Production
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/prod_account'
+  Environment:
+    Description: The environment
+    Type: String
+  CertificateArn:
+    Description: The certificate ARN
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/certificate_arn'
+  HostedZoneId:
+    Description: The hosted zone ID
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/hosted_zone_id'
+
+Mappings:
+  EnvironmentMap:
+    dev:
+      DomainName: "dev.serverlesspizza.com"
+      CacheMinTTL: 30
+      CacheMaxTTL: 120
+      CacheDefaultTTL: 60
+    prod:
+      DomainName: "www.serverlesspizza.com"
+      CacheMinTTL: 300
+      CacheMaxTTL: 1200
+      CacheDefaultTTL: 600
+
+Resources:
+  OriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: 
+          !Join
+            - ''
+            - - 'access-identity-'
+              - !FindInMap [EnvironmentMap, !Ref Environment, DomainName]
+              - '.s3.amazonaws.com'
+
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Description: Amazon S3 bucket for the website
+    Properties:
+      BucketName: !Sub "${Environment}.serverlesspizza.com"
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        BlockPublicAcls: true
+
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource: 
+              !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref WebsiteBucket
+                  - '/*'
+            Principal:
+              CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+          -
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+            Effect: Allow
+            Resource:
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref WebsiteBucket
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref WebsiteBucket
+                  - '/*'
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${ProductionAccount}:role/devopsAccountCodePipelineCFRole
+                - !Sub arn:aws:iam::${DevAccount}:role/devopsAccountCodePipelineCFRole
+
+  CloudFrontDistribution:
+    DependsOn:
+      - OriginAccessIdentity
+      - WebsiteBucket
+    Type: "AWS::CloudFront::Distribution"
+    Properties:
+      DistributionConfig:
+        Origins:
+        - DomainName: !GetAtt WebsiteBucket.DomainName
+          Id: !Ref WebsiteBucket
+          S3OriginConfig:
+            OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${OriginAccessIdentity}"
+        Aliases:
+        - !FindInMap [EnvironmentMap, !Ref Environment, DomainName]
+        PriceClass: PriceClass_100
+        Comment: !Sub "${Environment}.serverlesspizza.com"
+        DefaultRootObject: index.html
+        HttpVersion: http2
+        Enabled: true
+        IPV6Enabled: true
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.1_2016
+        CustomErrorResponses:
+        - ErrorCachingMinTTL: 300
+          ErrorCode: 403
+          ResponseCode: 200
+          ResponsePagePath: /
+        DefaultCacheBehavior:
+          MinTTL: !FindInMap [EnvironmentMap, !Ref Environment, CacheMinTTL]
+          MaxTTL: !FindInMap [EnvironmentMap, !Ref Environment, CacheMaxTTL]
+          DefaultTTL: !FindInMap [EnvironmentMap, !Ref Environment, CacheDefaultTTL]
+          ForwardedValues:
+            QueryString: true
+          TargetOriginId: !Ref WebsiteBucket
+          ViewerProtocolPolicy: "redirect-to-https"
+
+  ApiDNSRecord:
+    DependsOn: CloudFrontDistribution
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - Type: A
+          Name: !FindInMap [EnvironmentMap, !Ref Environment, DomainName]
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2 # (hardcoded for all CloudFormation templates)
+            DNSName: !GetAtt CloudFrontDistribution.DomainName

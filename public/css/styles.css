@@ -1,0 +1,119 @@
+body {
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+p {
+  font-size: 16pt;
+  line-height: 1.75em;
+}
+
+h1 {
+  margin: 20px 0;
+}
+
+.container {
+  margin-top: 75px !important;
+}
+
+form {
+  width: 50%;
+  margin-top: 30px;
+}
+
+footer {
+  padding: 30px 0;
+  margin-top: 20px;
+  text-align: center;
+}
+
+footer ul {
+  list-style: none;
+}
+
+.navbar-brand {
+  font-size: 18pt;
+}
+
+.nav-link {
+  font-weight: bold;
+  font-size: 14pt;
+}
+
+footer .nav-link {
+  font-size: 12pt;
+}
+
+footer p {
+  font-size: 11px;
+}
+
+#home-banner {
+  background-image: url("../images/pizza.jpg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  text-align: center;
+  margin-top: 62px;
+  height: calc(100vh - 62px);
+  padding: 20px;
+}
+
+.home-banner-scroll-down {
+  font-size: 70pt;
+}
+
+#home-banner h1 {
+  color: white;
+  font-weight: bold;
+  text-shadow: 2px 2px 8px #111;
+}
+
+#home-banner p {
+  color: white;
+  padding: 50px;
+  font-weight: bold;
+  font-size: 2em;
+  font-style: italic;
+  text-shadow: 2px 2px 8px #111;
+}
+
+#home-intro {
+  margin-top: 0px !important;
+  padding: 30px;
+}
+
+.basket-item {
+  border: 1px solid lightgrey;
+  margin: 20px;
+  padding: 10px 0;
+  min-height: 75px;
+}
+
+.order-detail,
+.order-detail-header {
+  border: 1px solid #ccc;
+  margin: 10px 0;
+}
+
+.order-detail-header {
+  font-weight: bold;
+}
+
+.product-detail div {
+  padding: 0;
+}
+.product-detail {
+  margin: 10px 0;
+}
+
+@media (min-width: 1281px) {
+  .basket-item p, .basket-item button {
+    margin: 0;
+    position: absolute;
+    top: 50%;
+    transform: translate(0%, -50%);
+  }
+}
